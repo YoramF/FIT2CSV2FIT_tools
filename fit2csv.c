@@ -143,6 +143,18 @@ _base_type_to_string *get_type_2str (FIT_FIT_BASE_TYPE type) {
 	return NULL;	
 }
 
+// convert unknown value type to string of byts values
+static char *unkonwn_mesg_type (void *val, int size) {
+   char *str = string;
+   while (size) {
+      sprintf(str, "%03hu/", *(unsigned char *)val);
+      str += 4;
+      val++;
+	  size--;
+   }
+   return string;
+}
+
 // cleanup function 
 void cleanup () {
    int i;
@@ -191,19 +203,19 @@ void print_data_mesg (unsigned char mesg_type) {
    void *val_ptr;
    _base_type_to_string *base_type_p;
 
-   fprintf(csv_f, "DATA: CT, %1d, M_TYPE, %02d,, ", rec_hdr & FIT_HDR_TIME_REC_BIT, mesg_type); 
+   fprintf(csv_f, "DATA: CT,%1d, M_TYPE,%02d,,", rec_hdr & FIT_HDR_TIME_REC_BIT, mesg_type); 
    // get offset to first field value
    val_ptr = (void *)buf;
 
    if (rec_hdr & FIT_HDR_TIME_REC_BIT)
-      fprintf(csv_f, " %d,, ",rec_hdr & FIT_HDR_TIME_OFFSET_MASK);
+      fprintf(csv_f, "%d,,",rec_hdr & FIT_HDR_TIME_OFFSET_MASK);
 
    for (i = 0; i < mesg_type_def[mesg_type]->num_fields; i++) {
       base_type_p = get_type_2str(mesg_type_def[mesg_type]->fields[i].base_type);
       if (base_type_p != NULL)
-         fprintf(csv_f, "%s, ", base_type_p->val_to_str(val_ptr, mesg_type_def[mesg_type]->fields[i].size));
+         fprintf(csv_f, "%s,", base_type_p->val_to_str(val_ptr, mesg_type_def[mesg_type]->fields[i].size));
       else
-         fprintf(csv_f, "UNDEFINED, %x, ", mesg_type_def[mesg_type]->fields[i].base_type);      // undefined base_type
+         fprintf(csv_f, unkonwn_mesg_type(val_ptr, mesg_type_def[mesg_type]->fields[i].size));    // undefined base_type
 
       // advance to next field value
       val_ptr += mesg_type_def[mesg_type]->fields[i].size;
@@ -211,7 +223,7 @@ void print_data_mesg (unsigned char mesg_type) {
 
    if (mesg_type_def[mesg_type]->is_dev) {
       for (i = 0; i < mesg_type_def[mesg_type]->num_dev_fields; i++) {
-         fprintf(csv_f, "%d:%d:%d, ", mesg_type_def[mesg_type]->dev_fields[i].def_num, mesg_type_def[mesg_type]->dev_fields[i].dev_index, mesg_type_def[mesg_type]->dev_fields[i].size);         
+         fprintf(csv_f, "%d:%d:%d,", mesg_type_def[mesg_type]->dev_fields[i].def_num, mesg_type_def[mesg_type]->dev_fields[i].dev_index, mesg_type_def[mesg_type]->dev_fields[i].size);         
       }
    }
    fprintf(csv_f, "\n");
@@ -220,13 +232,13 @@ void print_data_mesg (unsigned char mesg_type) {
 void print_def_mesg(unsigned char mesg_type) {
    int i;
 
-   fprintf(csv_f, "DEF: M_TYPE, %d, M_NUM, %d, FIELDS, %d, DEV_FIELDS, %d,, ", mesg_type, fit_fixed_mesg_def.global_mesg_num, mesg_type_def[mesg_type]->num_fields, mesg_type_def[mesg_type]->num_dev_fields);
+   fprintf(csv_f, "DEF: M_TYPE,%d, M_NUM,%d, FIELDS,%d, DEV_FIELDS,%d,,", mesg_type, fit_fixed_mesg_def.global_mesg_num, mesg_type_def[mesg_type]->num_fields, mesg_type_def[mesg_type]->num_dev_fields);
    for (i = 0; i < mesg_type_def[mesg_type]->num_fields; i++) {
-      fprintf(csv_f, "%d, %d, %d,, ", mesg_type_def[mesg_type]->fields[i].field_def_num, mesg_type_def[mesg_type]->fields[i].size, mesg_type_def[mesg_type]->fields[i].base_type);
+      fprintf(csv_f, "%d,%d,%d,,", mesg_type_def[mesg_type]->fields[i].field_def_num, mesg_type_def[mesg_type]->fields[i].size, mesg_type_def[mesg_type]->fields[i].base_type);
    }
    if (mesg_type_def[mesg_type]->is_dev) {
       for (i = 0; i < mesg_type_def[mesg_type]->num_dev_fields; i++) {
-         fprintf(csv_f, "%d, %d, %d,, ", mesg_type_def[mesg_type]->dev_fields[i].def_num, mesg_type_def[mesg_type]->dev_fields[i].size, mesg_type_def[mesg_type]->dev_fields[i].dev_index);
+         fprintf(csv_f, "%d,%d,%d,,", mesg_type_def[mesg_type]->dev_fields[i].def_num, mesg_type_def[mesg_type]->dev_fields[i].size, mesg_type_def[mesg_type]->dev_fields[i].dev_index);
       }
    }
    fprintf(csv_f, "\n");
