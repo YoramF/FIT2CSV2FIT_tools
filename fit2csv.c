@@ -65,7 +65,7 @@ typedef struct {
    char *(*val_to_str)(void *data, unsigned char size);
 } _base_type_to_string;
 
-static char string[FIT_MAX_FIELD_SIZE];
+static char string[FIT_MAX_FIELD_SIZE*4+1];  // to allow unkown base type string
 
 static char *int8_to_str (void *v, unsigned char size) {
 	sprintf(string, "%hhd", *(char *)v);
@@ -109,7 +109,12 @@ static char *uint64_to_str (void *v, unsigned char size) {
 }
 
 static char *string_to_str (void *v, unsigned char size) {
-   sprintf(string, "%-.*s", size, (char *)v);
+   // check for empty string
+   char *p = v;
+   if (p[0] == 0)
+      strcpy(string, "NULL");
+   else
+      strncpy(string, p, size);
    return string;
 }
 
@@ -143,8 +148,8 @@ _base_type_to_string *get_type_2str (FIT_FIT_BASE_TYPE type) {
 	return NULL;	
 }
 
-// convert unknown value type to string of byts values
-static char *unkonwn_mesg_type (void *val, int size) {
+// convert unknown value base type to string of byts values
+static char *unkonwn_base_type (void *val, int size) {
    char *str = string;
    while (size) {
       sprintf(str, "%03hu/", *(unsigned char *)val);
@@ -215,7 +220,7 @@ void print_data_mesg (unsigned char mesg_type) {
       if (base_type_p != NULL)
          fprintf(csv_f, "%s,", base_type_p->val_to_str(val_ptr, mesg_type_def[mesg_type]->fields[i].size));
       else
-         fprintf(csv_f, unkonwn_mesg_type(val_ptr, mesg_type_def[mesg_type]->fields[i].size));    // undefined base_type
+         fprintf(csv_f, unkonwn_base_type(val_ptr, mesg_type_def[mesg_type]->fields[i].size));    // undefined base_type
 
       // advance to next field value
       val_ptr += mesg_type_def[mesg_type]->fields[i].size;
@@ -345,7 +350,7 @@ int main (int argc, char *argv[]) {
 
    // open csvfile
    if ((csv_f = fopen(argv[2], "w")) == NULL) {
-      fprintf(stderr, "Failed to open CSV file: %s, %s\n", argv[1], strerror(errno));
+      fprintf(stderr, "Failed to open CSV file: %s, %s\n", argv[2], strerror(errno));
       return 1;
    }
 
