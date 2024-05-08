@@ -39,7 +39,6 @@ typedef struct {
 } __attribute__((__packed__)) _fit_fixed_mesg_def;
 
 typedef struct {
-   bool  is_dev;
    FIT_UINT8 num_fields;
    FIT_UINT8 num_dev_fields;
    unsigned short data_mesg_len;
@@ -118,6 +117,18 @@ static char *string_to_str (void *v, unsigned char size) {
    return string;
 }
 
+// convert unknown value base type to string of byts values
+static char *unkonwn_base_type (void *val, unsigned char size) {
+   char *str = string;
+   while (size) {
+      sprintf(str, "%03hu/", *(unsigned char *)val);
+      str += 4;
+      val++;
+	  size--;
+   }
+   return string;
+}
+
 static _base_type_to_string base2str[FIT_FIT_BASE_TYPE_COUNT] = {
    {FIT_FIT_BASE_TYPE_ENUM, &uint8_to_str},
    {FIT_FIT_BASE_TYPE_SINT8, &int8_to_str},
@@ -132,7 +143,7 @@ static _base_type_to_string base2str[FIT_FIT_BASE_TYPE_COUNT] = {
    {FIT_FIT_BASE_TYPE_UINT8Z, &uint8_to_str},
    {FIT_FIT_BASE_TYPE_UINT16Z, &uint16_to_str},
    {FIT_FIT_BASE_TYPE_UINT32Z, &uint32_to_str},
-   {FIT_FIT_BASE_TYPE_BYTE, &int8_to_str},
+   {FIT_FIT_BASE_TYPE_BYTE, &unkonwn_base_type}, // used by developer 
    {FIT_FIT_BASE_TYPE_SINT64, &int64_to_str},
    {FIT_FIT_BASE_TYPE_UINT64, &uint64_to_str},
    {FIT_FIT_BASE_TYPE_UINT64Z, &uint64_to_str}
@@ -146,18 +157,6 @@ _base_type_to_string *get_type_2str (FIT_FIT_BASE_TYPE type) {
 			return &base2str[i];
 	}
 	return NULL;	
-}
-
-// convert unknown value base type to string of byts values
-static char *unkonwn_base_type (void *val, int size) {
-   char *str = string;
-   while (size) {
-      sprintf(str, "%03hu/", *(unsigned char *)val);
-      str += 4;
-      val++;
-	  size--;
-   }
-   return string;
 }
 
 // cleanup function 
@@ -196,7 +195,7 @@ unsigned short calc_data_mesg_len (_fit_mesg_def *fit_mesg_def) {
    for (i = 0; i < fit_mesg_def->num_fields; i++)
       us += fit_mesg_def->fields[i].size;
 
-   // add total device fields data sizes
+   // add total dev fields data sizes
    for (i = 0; i < fit_mesg_def->num_dev_fields; i++)
       us += fit_mesg_def->dev_fields[i].size;
 
@@ -208,7 +207,8 @@ void print_data_mesg (unsigned char mesg_type) {
    void *val_ptr;
    _base_type_to_string *base_type_p;
 
-   fprintf(csv_f, "DATA: CT,%1d, M_TYPE,%02d,,", rec_hdr & FIT_HDR_TIME_REC_BIT, mesg_type); 
+   fprintf(csv_f, "DATA:CT,%1d,M_TYPE,%d,,", rec_hdr & FIT_HDR_TIME_REC_BIT, mesg_type); 
+
    // get offset to first field value
    val_ptr = (void *)buf;
 
@@ -218,34 +218,34 @@ void print_data_mesg (unsigned char mesg_type) {
    for (i = 0; i < mesg_type_def[mesg_type]->num_fields; i++) {
       base_type_p = get_type_2str(mesg_type_def[mesg_type]->fields[i].base_type);
       if (base_type_p != NULL)
-         fprintf(csv_f, "%s,", base_type_p->val_to_str(val_ptr, mesg_type_def[mesg_type]->fields[i].size));
+          fprintf(csv_f, "%s,", base_type_p->val_to_str(val_ptr, mesg_type_def[mesg_type]->fields[i].size));        
       else
          fprintf(csv_f, unkonwn_base_type(val_ptr, mesg_type_def[mesg_type]->fields[i].size));    // undefined base_type
+
 
       // advance to next field value
       val_ptr += mesg_type_def[mesg_type]->fields[i].size;
    }
 
-   if (mesg_type_def[mesg_type]->is_dev) {
-      for (i = 0; i < mesg_type_def[mesg_type]->num_dev_fields; i++) {
-         fprintf(csv_f, "%d:%d:%d,", mesg_type_def[mesg_type]->dev_fields[i].def_num, mesg_type_def[mesg_type]->dev_fields[i].dev_index, mesg_type_def[mesg_type]->dev_fields[i].size);         
-      }
+   for (i = 0; i < mesg_type_def[mesg_type]->num_dev_fields; i++) {
+      base_type_p = get_type_2str(FIT_FIT_BASE_TYPE_BYTE);
+      fprintf(csv_f, "%s,", base_type_p->val_to_str(val_ptr, mesg_type_def[mesg_type]->dev_fields[i].size));         
    }
+
+
    fprintf(csv_f, "\n");
 }
 
 void print_def_mesg(unsigned char mesg_type) {
    int i;
 
-   fprintf(csv_f, "DEF: M_TYPE,%d, M_NUM,%d, FIELDS,%d, DEV_FIELDS,%d,,", mesg_type, fit_fixed_mesg_def.global_mesg_num, mesg_type_def[mesg_type]->num_fields, mesg_type_def[mesg_type]->num_dev_fields);
-   for (i = 0; i < mesg_type_def[mesg_type]->num_fields; i++) {
+   fprintf(csv_f, "DEF:M_TYPE,%d,M_NUM,%d,FIELDS,%d,DEV_FIELDS,%d,,", mesg_type, fit_fixed_mesg_def.global_mesg_num, mesg_type_def[mesg_type]->num_fields, mesg_type_def[mesg_type]->num_dev_fields);
+   for (i = 0; i < mesg_type_def[mesg_type]->num_fields; i++)
       fprintf(csv_f, "%d,%d,%d,,", mesg_type_def[mesg_type]->fields[i].field_def_num, mesg_type_def[mesg_type]->fields[i].size, mesg_type_def[mesg_type]->fields[i].base_type);
-   }
-   if (mesg_type_def[mesg_type]->is_dev) {
-      for (i = 0; i < mesg_type_def[mesg_type]->num_dev_fields; i++) {
-         fprintf(csv_f, "%d,%d,%d,,", mesg_type_def[mesg_type]->dev_fields[i].def_num, mesg_type_def[mesg_type]->dev_fields[i].size, mesg_type_def[mesg_type]->dev_fields[i].dev_index);
-      }
-   }
+
+   for (i = 0; i < mesg_type_def[mesg_type]->num_dev_fields; i++)
+      fprintf(csv_f, "%d,%d,%d,,", mesg_type_def[mesg_type]->dev_fields[i].def_num, mesg_type_def[mesg_type]->dev_fields[i].size, mesg_type_def[mesg_type]->dev_fields[i].dev_index);
+
    fprintf(csv_f, "\n");
 
    // printf("DEF_messgae: %d\n", mesg_type);
@@ -283,11 +283,10 @@ _fit_mesg_def *add_new_def_mesg() {
          // update new mesg_type_def
          mesg_type_def[mesg_type]->num_fields = fit_fixed_mesg_def.num_fields;
          mesg_type_def[mesg_type]->num_dev_fields = 0;
-         mesg_type_def[mesg_type]->is_dev = false;
          memcpy(mesg_type_def[mesg_type]->fields, buf, fit_fixed_mesg_def.num_fields*sizeof(FIT_FIELD_DEF));
 
          if (rec_hdr & FIT_HDR_DEV_DATA_BIT) {
-            // first read how many device field there are
+            // first read how many dev field there are
             if (fit_read(&num_of_dev_fields, sizeof(num_of_dev_fields)) < sizeof(num_of_dev_fields))
                return NULL;
 
@@ -295,13 +294,12 @@ _fit_mesg_def *add_new_def_mesg() {
             if (fit_read(buf, read_size) < read_size)
                return NULL;
 
-            // reallocate mesg_type_def to accomodate device fields
+            // reallocate mesg_type_def to accomodate dev fields
             alloc_size += read_size;
             if ((mesg_type_def[mesg_type] = realloc(mesg_type_def[mesg_type], alloc_size)) == NULL) {
                fprintf(stderr, "Failed to allocate memory for mesg_type_def, %s\n", strerror(errno));
                return NULL;           
             }
-            mesg_type_def[mesg_type]->is_dev = true;
             mesg_type_def[mesg_type]->num_dev_fields = num_of_dev_fields;
             memcpy(mesg_type_def[mesg_type]->dev_fields, buf, num_of_dev_fields*sizeof(FIT_DEV_FIELD_DEF));         
          }
@@ -431,7 +429,7 @@ int main (int argc, char *argv[]) {
 
       if (crc == file_crc)
          fprintf(csv_f, "END,\nReading FIT file completed successfully\n");
-      else {
+      else{
          fprintf(stderr, "Failed to verify FIT file CRC\n");
          goto done_with_error;
       }
