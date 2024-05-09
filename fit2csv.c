@@ -428,7 +428,7 @@ int main (int argc, char *argv[]) {
          goto done_with_error;
 
       if (crc == file_crc)
-         fprintf(csv_f, "END,\nReading FIT file completed successfully\n");
+         fprintf(csv_f, "END,\n");
       else{
          fprintf(stderr, "Failed to verify FIT file CRC\n");
          goto done_with_error;
@@ -441,6 +441,7 @@ int main (int argc, char *argv[]) {
    }
 
    //done ok;
+   printf("Converting FIT to CSV file completed successfully\n");
    cleanup ();
    return 0;
 
