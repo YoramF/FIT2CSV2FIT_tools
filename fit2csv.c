@@ -220,7 +220,7 @@ void print_data_mesg (unsigned char mesg_type) {
       if (base_type_p != NULL)
           fprintf(csv_f, "%s,", base_type_p->val_to_str(val_ptr, mesg_type_def[mesg_type]->fields[i].size));        
       else
-         fprintf(csv_f, unkonwn_base_type(val_ptr, mesg_type_def[mesg_type]->fields[i].size));    // undefined base_type
+         fprintf(csv_f, "%s", unkonwn_base_type(val_ptr, mesg_type_def[mesg_type]->fields[i].size));    // undefined base_type
 
 
       // advance to next field value
