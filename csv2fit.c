@@ -212,16 +212,18 @@ _base_type_to_value *get_type_2base (FIT_FIT_BASE_TYPE type) {
 // get input line definition
 static int get_line_def (char *tok) {
 
-   if (strcmp (tok, "DATA") == 0)
-      return _FIT_DATA;
-   if (strcmp(tok, "DEF") == 0)
-      return _FIT_DEF;
-   if (strcmp(tok, "FIT_PROTOCOL_VERSION") == 0)
-      return _FIT_PROTOCOL_VERSION;
-   if (strcmp (tok, "FIT_PROFILE_VERSION") == 0)
-      return _FIT_PROFILE_VERSION;
-   if (strcmp (tok, "END") == 0)
-      return _FIT_END;
+   if (tok != NULL) {
+      if (strcmp (tok, "DATA") == 0)
+         return _FIT_DATA;
+      if (strcmp(tok, "DEF") == 0)
+         return _FIT_DEF;
+      if (strcmp(tok, "FIT_PROTOCOL_VERSION") == 0)
+         return _FIT_PROTOCOL_VERSION;
+      if (strcmp (tok, "FIT_PROFILE_VERSION") == 0)
+         return _FIT_PROFILE_VERSION;
+      if (strcmp (tok, "END") == 0)
+         return _FIT_END;
+   }
 
    return _FIT_NONE;
 }
