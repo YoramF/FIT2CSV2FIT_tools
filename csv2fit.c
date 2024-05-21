@@ -315,8 +315,8 @@ bool process_data_line() {
 
       //set reac header
       wbuf[0] |= FIT_HDR_TIME_REC_BIT;
-      wbuf[0] |= time_offset & FIT_HDR_TIME_OFFSET_MASK;
       wbuf[0] |= (mesg_type & 0x3) << FIT_HDR_TIME_TYPE_SHIFT;
+      wbuf[0] |= time_offset & FIT_HDR_TIME_OFFSET_MASK;
    }
    else
       // simple data record

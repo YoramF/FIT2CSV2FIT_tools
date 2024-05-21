@@ -30,6 +30,8 @@
 #include <fit_example.h>
 #include <fit_crc.h>
 
+#include <fit_titles.h>
+
 // define fixed portion of fit message record. it must be packed;
 typedef struct {
    FIT_UINT8 reserved_1;
@@ -214,6 +216,8 @@ void print_data_mesg (unsigned char mesg_type) {
 
    if (rec_hdr & FIT_HDR_TIME_REC_BIT)
       fprintf(csv_f, "%d,,",rec_hdr & FIT_HDR_TIME_OFFSET_MASK);
+   else
+      fprintf(csv_f, ",,");  // keep csv format aligned with fields titles
 
    for (i = 0; i < mesg_type_def[mesg_type]->num_fields; i++) {
       base_type_p = get_type_2str(mesg_type_def[mesg_type]->fields[i].base_type);
@@ -232,6 +236,18 @@ void print_data_mesg (unsigned char mesg_type) {
       fprintf(csv_f, "%s,", base_type_p->val_to_str(val_ptr, mesg_type_def[mesg_type]->dev_fields[i].size));         
    }
 
+   fprintf(csv_f, "\n");
+}
+
+// print message definition text and fields titles
+// this line starts with "#" do that csv2fit will ignore it when reading the csv file
+void print_data_titles (unsigned char mesg_type) {
+   int i;
+
+   fprintf(csv_f, "#DEF:M_TYPE,%d,%s,%d,,,,", mesg_type, get_mesg_title(fit_fixed_mesg_def.global_mesg_num), fit_fixed_mesg_def.global_mesg_num);
+
+   for (i = 0; i < mesg_type_def[mesg_type]->num_fields; i++)
+      fprintf(csv_f, "%s,", get_field_title(fit_fixed_mesg_def.global_mesg_num, mesg_type_def[mesg_type]->fields[i].field_def_num));
 
    fprintf(csv_f, "\n");
 }
@@ -248,7 +264,7 @@ void print_def_mesg(unsigned char mesg_type) {
 
    fprintf(csv_f, "\n");
 
-   // printf("DEF_messgae: %d\n", mesg_type);
+   print_data_titles (mesg_type);
 }
 
 // read record definition from FIT file
@@ -411,6 +427,12 @@ int main (int argc, char *argv[]) {
          }
          else
             mesg_type = rec_hdr & FIT_HDR_TYPE_MASK;
+
+         // validate mesg_type
+         if (mesg_type_def[mesg_type] == NULL) {
+            fprintf(stderr, "DATA record with wrong message_type number: %d\n", mesg_type);
+            goto done_with_error;             
+         }
 
          data_size = mesg_type_def[mesg_type]->data_mesg_len;
          if ((r = fit_read(buf, data_size)) < data_size)
