@@ -17,7 +17,7 @@ Fields with values such as "010/234/255/255/" are fields of type BYTE with size.
 size of 4 bytes. 
 
 To generate the GARMIN FIT SDK C library you need to fetch the sources form 
-https://developer.garmin.com/downloads/fit/sdk/FitSDKRelease_21.133.00.zip.
+https://developer.garmin.com/downloads/fit/sdk/FitSDKRelease_21.141.00.zip.
 Extract all c and h files.
 
 complie all c files and add all objects file to libfit.a library file.
