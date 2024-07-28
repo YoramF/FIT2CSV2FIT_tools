@@ -25,4 +25,4 @@ csv2fit_d.o:	csv2fit.c
 	gcc -o csv2fit_d.o -c -g csv2fit.c -I../FIT_SDK/src
 
 clean:
-	rm *.o *.exe
+	rm -f *.o *.exe

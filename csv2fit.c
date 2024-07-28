@@ -1,6 +1,6 @@
 /*
 
-   This code uses GARMIN FIT SDK V21.133.00 (https://developer.garmin.com/downloads/fit/sdk/FitSDKRelease_21.133.00.zip)
+   This code uses GARMIN FIT SDK V21.141.00 (https://developer.garmin.com/downloads/fit/sdk/FitSDKRelease_21.141.00.zip)
    Under the Flexible and Interoperable Data Transfer (FIT) Protocol License:
    (https://www.thisisant.com/developer/ant/licensing/flexible-and-interoperable-data-transfer-fit-protocol-license).
 
@@ -538,7 +538,7 @@ int main (int argc, char *argv[]) {
 
    if (argc < 3) {
       fprintf(stderr, "Missing arguments\n");
-      fprintf(stderr, "USAGE: fit2csv <FIT_file_name> <CSV_file_name>\n");
+      fprintf(stderr, "USAGE: csv2fit <CSV_file_name> <FIT_file_name>\n");
       return 1;
    }
 
