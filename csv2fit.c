@@ -58,94 +58,94 @@ static FIT_UINT32 fit_data_write;                  // track how much data was re
 static _fit_mesg_def *mesg_type_def[FIT_HDR_TYPE_MASK+1]; // track on local message types 
 static FILE *fit_f;                                // fit file handle
 static FILE *csv_f;                                // csv file handle
-static unsigned char *wbuf;                        // write buffer
-static char *rbuf;                                 // read buffer
+static FILE *cfit_f;                                // check file
+static unsigned char *wbuf;                       // write buffer 
+static char *rbuf;                                 // read buffer 
 static char *delim = ":,\n";                       // CSV values delimitors
 static char *token;                                // parsing token
+
+#ifdef DEBUG
+int line = 0;
+static unsigned char *cbuf;                        // check buffer
+#endif
 
 /****************************************************/
 /* convert strings to FIT values based on their type */
 /****************************************************/
 typedef struct {
    FIT_FIT_BASE_TYPE base_type;
-   int (*str_to_val)(char *string, void *rv, int size);
+   int (*str_to_val)(char *string, unsigned char *rv, char size);
 } _base_type_to_value;
 
-
-static int to_uint8 (char *string, void *val, int size) {
-	unsigned char uc = 0;
+#ifdef DEBUG
+// return 0 if 
+int cmp_buff (int size) {
    int s;
+   if (fread(cbuf, 1, size, cfit_f) < size) {
+      fprintf(stderr, "Failed to read from check file: %s\n", strerror(errno));
+      s = 1;
+   }
+   else
+      s = memcmp(cbuf, wbuf, size); 
 
-	s = sscanf(string, "%hhu", &uc);
-	memcpy(val, &uc, sizeof(uc));
-   return s;
+   return s;  
+}
+#endif
+
+static int str2val (char *str, unsigned char *val, char size, char t_size, char *f1) {
+	char *del = "|,";
+   char *tokloc;     // local token
+   char *svloc;      // save local token location
+   char i = 0;
+
+	// reset rval;
+	memset(val, 0, size);
+
+	tokloc = strtok_r(str, del, &svloc);      // use strtok_r() to keep global strtok() on right track
+	while ((tokloc != NULL) && (i < size)) {
+		sscanf(tokloc, f1, val);
+		i += t_size;
+      val += t_size;
+		tokloc = strtok_r(NULL, del, &svloc);
+	}
+
+   return i;
 }
 
-static int to_int8 (char *string, void *val, int size) {
-	char ch = 0;
-   int s;
-
-	s = sscanf(string, "%hhd", &ch);
-	memcpy(val, &ch, sizeof(ch));
-   return s;
+static int to_uint8 (char *string, unsigned char *val, char size) {
+   return str2val(string, val, size, sizeof(char), "%hhu");
 }
 
-static int to_int16 (char *string, void *val, int size) {
-	short sh = 0;
-   int s;
+static int to_int8 (char *string, unsigned char *val, char size) {
+   return str2val(string, val, size, sizeof(char), "%hhd");
+}
 
-	s = sscanf(string, "%hd", &sh);
-	memcpy(val, &sh, sizeof(sh));
-   return s;
+static int to_int16 (char *string, unsigned char *val, char size) {
+   return str2val(string, val, size, sizeof(short), "%hd");
 }
 
 
-static int to_uint16 (char *string, void *val, int size) {
-	unsigned short ush = 0;
-   int s;
-
-	s = sscanf(string, "%hu", &ush);
-	memcpy(val, &ush, sizeof(ush));
-   return s;
+static int to_uint16 (char *string, unsigned char *val, char size) {
+   return str2val(string, val, size, sizeof(short), "%hu");
 }
 
-static int to_int32 (char *string, void *val, int size) {
-	long lg = 0;
-   int s;
-
-	s = sscanf(string, "%ld", &lg);
-	memcpy(val, &lg, sizeof(lg));
-   return s;
+static int to_int32 (char *string, unsigned char *val, char size) {
+   return str2val(string, val, size, sizeof(long), "%d");
 }
 
-static int to_uint32 (char *string, void *val, int size) {
-	unsigned long ulg = 0;
-   int s;
-
-	s = sscanf(string, "%lu", &ulg);
-	memcpy(val, &ulg, sizeof(ulg));
-   return s;
+static int to_uint32 (char *string, unsigned char *val, char size) {
+   return str2val(string, val, size, sizeof(long), "%u");
 }
 
-static int to_int64 (char *string, void *val, int size) {
-	long long llg = 0L;
-   int s;
-
-	s = sscanf(string, "%lld", &llg);
-	memcpy(val, &llg, sizeof(llg));
-   return s;
+static int to_int64 (char *string, unsigned char *val, char size) {
+   return str2val(string, val, size, sizeof(long long), "%lld");
 }
 
-static int to_uint64 (char *string, void *val, int size) {
-	unsigned long long ullg = 0L;
-   int s;
-
-	s = sscanf(string, "%llu", &ullg);
-	memcpy(val, &ullg, sizeof(ullg));
-   return s; 
+static int to_uint64 (char *string, unsigned char *val, char size) {
+   return str2val(string, val, size, sizeof(long long), "%llu");
 }
 
-static int to_string (char *string, void *val, int size) {
+static int to_string (char *string, unsigned char *val, char size) {
    // initialize val
    memset(val, 0, size);
    // copy string to val only of string != "NULL"
@@ -156,7 +156,7 @@ static int to_string (char *string, void *val, int size) {
 
 
 // handle unknown base type
-static int unkonwn_base_type_2val (char *str, void *val, int size) {
+static int unkonwn_base_type_2val (char *str, unsigned char *val, char size) {
 	unsigned char rval[size];
 	char *del = "/";
 	int i = 0;
@@ -261,6 +261,19 @@ int fit_write (void *buf, int size) {
    return i;   
 }
 
+void print_def_mesg(unsigned char mesg_type) {
+   int i;
+
+   fprintf(stderr, "DEF:M_TYPE,%d,FIELDS,%d,DEV_FIELDS,%d,,", mesg_type, mesg_type_def[mesg_type]->num_fields, mesg_type_def[mesg_type]->num_dev_fields);
+   for (i = 0; i < mesg_type_def[mesg_type]->num_fields; i++)
+      fprintf(stderr, "%d,%d,%d,,", mesg_type_def[mesg_type]->fields[i].field_def_num, mesg_type_def[mesg_type]->fields[i].size, mesg_type_def[mesg_type]->fields[i].base_type);
+
+   for (i = 0; i < mesg_type_def[mesg_type]->num_dev_fields; i++)
+      fprintf(stderr, "%d,%d,%d,,", mesg_type_def[mesg_type]->dev_fields[i].def_num, mesg_type_def[mesg_type]->dev_fields[i].size, mesg_type_def[mesg_type]->dev_fields[i].dev_index);
+
+   fprintf(stderr, "\n");
+}
+
 // process line as DATA line
 // data line must include the following fields:
 // CT value is a bit
@@ -297,7 +310,7 @@ bool process_data_line() {
    token = strtok(NULL, delim);
    if (token == NULL)
       return false;
-   to_uint8(token, &mesg_type, 1);
+   to_uint8(token, (unsigned char *)&mesg_type, 1);
 
    // check if mesg_type_def[mesg_type] exists
    if (mesg_type_def[mesg_type] == NULL)
@@ -311,7 +324,7 @@ bool process_data_line() {
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-      to_uint8(token, &time_offset, 1);
+      to_uint8(token, (unsigned char *)&time_offset, 1);
 
       //set reac header
       wbuf[0] |= FIT_HDR_TIME_REC_BIT;
@@ -336,12 +349,12 @@ bool process_data_line() {
    }
 
    // scan all dev_field values and add their binary values to wbuf according to their types
+   base_type_p = get_type_2base(FIT_FIT_BASE_TYPE_BYTE);    
    for (i = 0; i < mesg_def_p->num_dev_fields; i++) {
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-
-      base_type_p = get_type_2base(FIT_FIT_BASE_TYPE_BYTE);      
+ 
       if (base_type_p->str_to_val(token, wbuf+wbuf_off, mesg_def_p->dev_fields[i].size) < 1)
          return false;
       
@@ -352,8 +365,18 @@ bool process_data_line() {
    if (fit_write(wbuf, wbuf_off) < wbuf_off)
       return false;
 
+#ifdef DEBUG
+   // check against check file
+   if (cmp_buff(wbuf_off)) {
+      fprintf(stderr, "Failed in process data line\n");
+      printf("[line: %d] ", line);
+      print_def_mesg(mesg_type);
+   }
+#endif
+
    return true;
 }
+
 
 // process line as MESSAGE DEFINITION line
 // definition line includes the following fields:
@@ -390,7 +413,7 @@ bool process_definition_line() {
    token = strtok(NULL, delim);
    if (token == NULL)
       return false;
-   to_uint8(token, &mesg_type, 1);
+   to_uint8(token, (unsigned char *)&mesg_type, 1);
    wbuf[0] |= mesg_type & FIT_HDR_TYPE_MASK;  // set message type;
 
    // get global message number title
@@ -401,7 +424,7 @@ bool process_definition_line() {
    token = strtok(NULL, delim);
    if (token == NULL)
       return false;
-   to_uint16(token, &global_mesg_num, 2);
+   to_uint16(token, (unsigned char *)&global_mesg_num, 2);
 
    // read number of fields title
    token = strtok(NULL, delim);
@@ -412,7 +435,7 @@ bool process_definition_line() {
    token = strtok(NULL, delim);
    if (token == NULL)
       return false;
-   to_uint8(token, &num_fields, 1);
+   to_uint8(token, (unsigned char *)&num_fields, 1);
 
    // read number of dev fields number title
    token = strtok(NULL, delim);
@@ -423,7 +446,7 @@ bool process_definition_line() {
    token = strtok(NULL, delim);
    if (token == NULL)
       return false;
-   to_uint8(token, &num_dev_fields, 1);   
+   to_uint8(token, (unsigned char *)&num_dev_fields, 1);   
 
    fit_fixed_mesg_def.arch = 0;
    fit_fixed_mesg_def.reserved_1 = 0;
@@ -456,30 +479,30 @@ bool process_definition_line() {
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-      to_uint8(token, &mesg_type_def[mesg_type]->fields[i].field_def_num, 1);
+      to_uint8(token, (unsigned char *)&mesg_type_def[mesg_type]->fields[i].field_def_num, 1);
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-      to_uint8(token, &mesg_type_def[mesg_type]->fields[i].size, 1);
+      to_uint8(token, (unsigned char *)&mesg_type_def[mesg_type]->fields[i].size, 1);
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-      to_uint8(token, &mesg_type_def[mesg_type]->fields[i].base_type, 1);
+      to_uint8(token, (unsigned char *)&mesg_type_def[mesg_type]->fields[i].base_type, 1);
    }
 
    for (i = 0; i < num_dev_fields; i++) {
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-      to_uint8(token, &mesg_type_def[mesg_type]->dev_fields[i].def_num, 1);
+      to_uint8(token, (unsigned char *)&mesg_type_def[mesg_type]->dev_fields[i].def_num, 1);
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-      to_uint8(token, &mesg_type_def[mesg_type]->dev_fields[i].size, 1);
+      to_uint8(token, (unsigned char *)&mesg_type_def[mesg_type]->dev_fields[i].size, 1);
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-      to_uint8(token, &mesg_type_def[mesg_type]->dev_fields[i].dev_index, 1);
+      to_uint8(token, (unsigned char *)&mesg_type_def[mesg_type]->dev_fields[i].dev_index, 1);
    }
 
    // update wbuf
@@ -502,6 +525,14 @@ bool process_definition_line() {
    if (fit_write(wbuf, wbuf_off) < wbuf_off)
       return false;
 
+#ifdef DEBUG
+   // check against check file
+   if (cmp_buff(wbuf_off)) {
+      fprintf(stderr, "Failed in process definition line\n");
+      print_def_mesg(mesg_type);
+   }
+#endif
+
    return true;
 }
 
@@ -511,8 +542,12 @@ void cleanup () {
 
    fclose(fit_f);
    fclose(csv_f);
+   fclose(cfit_f); 
    free(rbuf);
    free(wbuf);
+#ifdef DEBUG
+   free(cbuf);
+#endif
    for (i = 0; i < FIT_HDR_TYPE_MASK+1; i++) {
       if (mesg_type_def[i] != NULL)
          free(mesg_type_def[i]);
@@ -530,17 +565,25 @@ int main (int argc, char *argv[]) {
    // print general license note
    printf("\
 ******************************************************************************\n\
-   csv2fit  Copyright (C) 2024  Yoram Finder\n\
+   csv2fit  (V2.0) Copyright (C) 2024  Yoram Finder\n\
    This program comes with ABSOLUTELY NO WARRANTY;\n\
    This is free software, and you are welcome to redistribute it under the\n\
    GNU License (https://www.gnu.org/licenses/) conditions;\n\
 ******************************************************************************\n");
 
+#ifdef DEBUG
+   if (argc < 4) {
+      fprintf(stderr, "Missing arguments\n");
+      fprintf(stderr, "USAGE: csv2fit <CSV_file_name> <FIT_file_name> <CHECK_FIT_FILE\n");
+      return 1;
+   }
+#else
    if (argc < 3) {
       fprintf(stderr, "Missing arguments\n");
       fprintf(stderr, "USAGE: csv2fit <CSV_file_name> <FIT_file_name>\n");
       return 1;
    }
+#endif
 
    // open csv file
    if ((csv_f = fopen(argv[1], "r")) == NULL) {
@@ -555,11 +598,24 @@ int main (int argc, char *argv[]) {
       return 1;
    }
 
+#ifdef DEBUG
+   // open check fit file
+   if ((cfit_f = fopen(argv[3], "rb")) == NULL) {
+      fprintf(stderr, "Failed to open CHECK FIT file: %s, %s\n", argv[3], strerror(errno));
+      fclose(csv_f);
+      fclose(fit_f);
+      return 1;
+   }
+#endif
+
    // allocate local read buf
    if ((rbuf = malloc(FIT_MAX_MESG_SIZE)) == NULL) {
       fprintf(stderr, "Failed to allocate memory, %s\n", strerror(errno));
       fclose(csv_f);
       fclose(fit_f);  
+#ifdef DEBUG
+      fclose(cfit_f); 
+#endif
       return 1;
    }
 
@@ -568,9 +624,25 @@ int main (int argc, char *argv[]) {
       fprintf(stderr, "Failed to allocate memory, %s\n", strerror(errno));
       fclose(fit_f);      
       fclose(csv_f);
+#ifdef DEBUG
+      fclose(cfit_f); 
+#endif
       free(rbuf);
       return 1;
    }
+
+#ifdef DEBUG
+      // allocate check buffer buf
+   if ((cbuf = malloc(FIT_MAX_MESG_SIZE)) == NULL) {
+      fprintf(stderr, "Failed to allocate memory, %s\n", strerror(errno));
+      fclose(fit_f);      
+      fclose(csv_f);
+      fclose(cfit_f); 
+      free(rbuf);
+      free(wbuf);
+      return 1;
+   }
+#endif
 
    // init all fit_mesg_def pointers to NULL
    memset(&mesg_type_def, 0, sizeof(mesg_type_def));
@@ -584,7 +656,12 @@ int main (int argc, char *argv[]) {
    if (!WriteFileHeader(&fit_file_hdr))
       goto done_with_error;
 
-   
+#ifdef DEBUG
+   // advance check file past file_header
+   if (fseek(cfit_f, FIT_FILE_HDR_SIZE, SEEK_SET) != 0)
+      fprintf(stderr, "Seek failed\n");
+#endif
+
    // file header crc check succeeded. now reset crc to check whole file CRC
    crc = 0;
    fit_data_write = 0;
@@ -594,17 +671,20 @@ int main (int argc, char *argv[]) {
 
       token = strtok(rbuf, delim);
       line_def = get_line_def (token);
+#ifdef DEBUG
+      line++;
+#endif
 
       switch (line_def) {
          case _FIT_PROTOCOL_VERSION:
             token = strtok(NULL, delim);
                if (token != NULL)
-         	      to_uint8(token, &fit_file_hdr.protocol_version, 1) ;
+         	      to_uint8(token, (unsigned char *)&fit_file_hdr.protocol_version, 1) ;
             break;
          case _FIT_PROFILE_VERSION:
             token = strtok(NULL, delim);
                if (token != NULL)
-         	      to_uint16(token, &fit_file_hdr.profile_version, 2) ;
+         	      to_uint16(token, (unsigned char *)&fit_file_hdr.profile_version, 2) ;
             break;
          case _FIT_DEF:
             if (!process_definition_line()) {

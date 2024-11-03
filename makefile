@@ -22,7 +22,7 @@ csv2fit_d:	csv2fit_d.o ../FIT_SDK/libfit_d.a
 	gcc -o csv2fit_debug.exe csv2fit_d.o -lfit_d -L../FIT_SDK
 
 csv2fit_d.o:	csv2fit.c
-	gcc -o csv2fit_d.o -c -g csv2fit.c -I../FIT_SDK/src
+	gcc -o csv2fit_d.o -c -g csv2fit.c -I../FIT_SDK/src -DDEBUG
 
 clean:
 	rm -f *.o *.exe

@@ -16,6 +16,8 @@ You can see in fit_example.h also what are the units for each message field.
 Fields with values such as "010/234/255/255/" are fields of type BYTE with size. In this case
 size of 4 bytes. 
 
+Fields which are array of any type will be converted to string like "012|001|255" or "0123456|0120000" depending on the type of the element.
+
 To generate the GARMIN FIT SDK C library you need to fetch the sources form 
 https://developer.garmin.com/downloads/fit/sdk/FitSDKRelease_21.141.00.zip.
 Extract all c and h files.

@@ -63,53 +63,85 @@ static int fit_data_read;                          // track how much data was re
 /****************************************************/
 typedef struct {
    FIT_FIT_BASE_TYPE base_type;
-   char *(*val_to_str)(void *data, unsigned char size);
+   char *(*val_to_str)(unsigned char *data, unsigned char size);
 } _base_type_to_string;
+
+enum {
+   int8 = 0,
+   uint8,
+   int16,
+   uint16,
+   int32,
+   uint32,
+   int64,
+   uint64
+};
 
 static char string[FIT_MAX_FIELD_SIZE*4+1];  // to allow unkown base type string
 
-static char *int8_to_str (void *v, unsigned char size) {
-	sprintf(string, "%hhd", *(char *)v);
+static int prf (char *s, char *format, unsigned char *val, int type) {
+   switch (type) {
+      case int8: return sprintf(s, format, *(char *)val);
+      case uint8: return sprintf(s, format, *(unsigned char *)val);
+      case int16: return sprintf(s, format, *(short *)val);
+      case uint16: return sprintf(s, format, *(unsigned short *)val);
+      case int32: return sprintf(s, format, *(long *)val);
+      case uint32: return sprintf(s, format, *(unsigned long *)val);
+      case int64: return sprintf(s, format, *(long long *)val);
+      case uint64: return sprintf(s, format, *(unsigned long long *)val);
+      default:
+   }
+}
+
+static char *val2str (unsigned char *v, unsigned char size, char t_size, char *f1, char *f2, char f_s, int type) {
+   char *s = string;
+	prf(s, f1, v, type);
+   size -= t_size;
+   v += t_size;
+   s += f_s;
+   while (size) {
+   	prf(s, f2, v, type);
+      size -= t_size;
+      v += t_size;
+      s += f_s+1;
+   }
 	return string;
 }
 
-static char *uint8_to_str (void *v, unsigned char size) {
-	sprintf(string, "%hhu", *(unsigned char *)v);
-	return string;
+static char *int8_to_str (unsigned char *v, unsigned char size) {
+	return val2str(v, size, sizeof(char), "%3.3hhd", "|%3.3hhd", 3, int8);
 }
 
-static char *int16_to_str (void *v, unsigned char size) {
-	sprintf(string, "%hd", *(short int *)v);
-	return string;
+static char *uint8_to_str (unsigned char *v, unsigned char size) {
+	return val2str(v, size, sizeof(char), "%3.3hhu", "|%3.3hhu", 3, uint8);
+}
+
+static char *int16_to_str (unsigned char *v, unsigned char size) {
+	return val2str(v, size, sizeof(short), "%6.6hd", "|%6.6hd", 6, int16);
 }
 
 
-static char *uint16_to_str (void *v, unsigned char size) {
-	sprintf(string, "%hu", *(unsigned short int *)v);
-	return string;
+static char *uint16_to_str (unsigned char *v, unsigned char size) {
+	return val2str(v, size, sizeof(short), "%6.6hu", "|%6.6hu", 6, uint16);
 }
 
-static char *int32_to_str (void *v, unsigned char size) {
-	sprintf(string, "%ld", *(long int *)v);
-	return string;
+static char *int32_to_str (unsigned char *v, unsigned char size) {
+	return val2str(v, size, sizeof(long), "%11.11d", "|%11.11d", 11, int32);
 }
 
-static char *uint32_to_str (void *v, unsigned char size) {
-	sprintf(string, "%lu", *(unsigned long int *)v);
-	return string;
+static char *uint32_to_str (unsigned char *v, unsigned char size) {
+	return val2str(v, size, sizeof(long), "%11.11u", "|%11.11u", 11, uint32);
 }
 
-static char *int64_to_str (void *v, unsigned char size) {
-	sprintf(string, "%lld",*(long long *)v); 
-   	return string;
+static char *int64_to_str (unsigned char *v, unsigned char size) {
+	return val2str(v, size, sizeof(long long), "%21.21lld", "|%21.21lld", 21, int64);
 }
 
-static char *uint64_to_str (void *v, unsigned char size) {
-	sprintf(string, "%llu",*(unsigned long long *)v); 
-   	return string;
+static char *uint64_to_str (unsigned char *v, unsigned char size) {
+	return val2str(v, size, sizeof(long long), "%21.21llu", "|%21.21llu", 21, uint64);
 }
 
-static char *string_to_str (void *v, unsigned char size) {
+static char *string_to_str (unsigned char *v, unsigned char size) {
    // check for empty string
    char *p = v;
    if (p[0] == 0)
@@ -120,12 +152,13 @@ static char *string_to_str (void *v, unsigned char size) {
 }
 
 // convert unknown value base type to string of byts values
-static char *unkonwn_base_type (void *val, unsigned char size) {
+static char *unkonwn_base_type (unsigned char *val, unsigned char size) {
    char *str = string;
+   unsigned char *uc = val;
    while (size) {
-      sprintf(str, "%03hu/", *(unsigned char *)val);
+      sprintf(str, "%03hhu/", *uc);
       str += 4;
-      val++;
+      uc++;
 	  size--;
    }
    return string;
@@ -231,8 +264,9 @@ void print_data_mesg (unsigned char mesg_type) {
       val_ptr += mesg_type_def[mesg_type]->fields[i].size;
    }
 
+   // read developer fields. we treat all developer fields as unknow type
+   base_type_p = get_type_2str(FIT_FIT_BASE_TYPE_BYTE);
    for (i = 0; i < mesg_type_def[mesg_type]->num_dev_fields; i++) {
-      base_type_p = get_type_2str(FIT_FIT_BASE_TYPE_BYTE);
       fprintf(csv_f, "%s,", base_type_p->val_to_str(val_ptr, mesg_type_def[mesg_type]->dev_fields[i].size));         
    }
 
@@ -344,7 +378,7 @@ int main (int argc, char *argv[]) {
    // print general license note
    printf("\
 ******************************************************************************\n\
-   fit2csv  Copyright (C) 2024  Yoram Finder\n\
+   fit2csv (V2.0) Copyright (C) 2024  Yoram Finder\n\
    This program comes with ABSOLUTELY NO WARRANTY;\n\
    This is free software, and you are welcome to redistribute it under the\n\
    GNU License (https://www.gnu.org/licenses/) conditions;\n\
