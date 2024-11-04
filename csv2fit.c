@@ -63,9 +63,8 @@ static unsigned char *wbuf;                       // write buffer
 static char *rbuf;                                 // read buffer 
 static char *delim = ":,\n";                       // CSV values delimitors
 static char *token;                                // parsing token
-
+static int line_num = 0;
 #ifdef DEBUG
-int line = 0;
 static unsigned char *cbuf;                        // check buffer
 #endif
 
@@ -369,7 +368,7 @@ bool process_data_line() {
    // check against check file
    if (cmp_buff(wbuf_off)) {
       fprintf(stderr, "Failed in process data line\n");
-      printf("[line: %d] ", line);
+      printf("[line: %d] ", line_num);
       print_def_mesg(mesg_type);
    }
 #endif
@@ -671,9 +670,7 @@ int main (int argc, char *argv[]) {
 
       token = strtok(rbuf, delim);
       line_def = get_line_def (token);
-#ifdef DEBUG
-      line++;
-#endif
+      line_num++;
 
       switch (line_def) {
          case _FIT_PROTOCOL_VERSION:
@@ -688,13 +685,13 @@ int main (int argc, char *argv[]) {
             break;
          case _FIT_DEF:
             if (!process_definition_line()) {
-               fprintf(stderr, "Error processing definition line, %s\n", rbuf);
+               fprintf(stderr, "Error processing definition line %d\n", line_num);
                goto done_with_error;
             }
             break;
          case _FIT_DATA:
             if (!process_data_line()) {
-               fprintf(stderr, "Error processing data line, %s\n", rbuf);
+               fprintf(stderr, "Error processing data line %d\n", line_num);
                goto done_with_error;
             }
             break;
