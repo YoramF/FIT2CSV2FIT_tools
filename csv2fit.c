@@ -59,13 +59,13 @@ static _fit_mesg_def *mesg_type_def[FIT_HDR_TYPE_MASK+1]; // track on local mess
 static FILE *fit_f;                                // fit file handle
 static FILE *csv_f;                                // csv file handle
 static FILE *cfit_f;                                // check file
-static unsigned char *wbuf;                       // write buffer 
-static char *rbuf;                                 // read buffer 
-static char *delim = ":,\n";                       // CSV values delimitors
-static char *token;                                // parsing token
-static int line_num = 0;
+static uint8_t *wbuf;                       // write buffer 
+static int8_t *rbuf;                                 // read buffer 
+static int8_t *delim = ":,\n";                       // CSV values delimitors
+static int8_t *token;                                // parsing token
+static int32_t line_num = 0;
 #ifdef DEBUG
-static unsigned char *cbuf;                        // check buffer
+static uint8_t *cbuf;                        // check buffer
 #endif
 
 /****************************************************/
@@ -73,13 +73,13 @@ static unsigned char *cbuf;                        // check buffer
 /****************************************************/
 typedef struct {
    FIT_FIT_BASE_TYPE base_type;
-   int (*str_to_val)(char *string, unsigned char *rv, char size);
+   int32_t (*str_to_val)(int8_t *string, uint8_t *rv, int8_t size);
 } _base_type_to_value;
 
 #ifdef DEBUG
 // return 0 if 
-int cmp_buff (int size) {
-   int s;
+int32_t cmp_buff (int32_t size) {
+   int32_t s;
    if (fread(cbuf, 1, size, cfit_f) < size) {
       fprintf(stderr, "Failed to read from check file: %s\n", strerror(errno));
       s = 1;
@@ -91,11 +91,11 @@ int cmp_buff (int size) {
 }
 #endif
 
-static int str2val (char *str, unsigned char *val, char size, char t_size, char *f1) {
-	char *del = "|,";
-   char *tokloc;     // local token
+static int32_t str2val (int8_t *str, uint8_t *val, int8_t size, int8_t t_size, int8_t *f1) {
+	int8_t *del = "|,";
+   int8_t *tokloc;     // local token
    char *svloc;      // save local token location
-   char i = 0;
+   int8_t i = 0;
 
 	// reset rval;
 	memset(val, 0, size);
@@ -111,40 +111,39 @@ static int str2val (char *str, unsigned char *val, char size, char t_size, char 
    return i;
 }
 
-static int to_uint8 (char *string, unsigned char *val, char size) {
-   return str2val(string, val, size, sizeof(char), "%hhu");
+static int32_t to_uint8 (int8_t *string, uint8_t *val, int8_t size) {
+   return str2val(string, val, size, sizeof(uint8_t), "%hhu");
 }
 
-static int to_int8 (char *string, unsigned char *val, char size) {
-   return str2val(string, val, size, sizeof(char), "%hhd");
+static int32_t to_int8 (int8_t *string, uint8_t *val, int8_t size) {
+   return str2val(string, val, size, sizeof(int8_t), "%hhd");
 }
 
-static int to_int16 (char *string, unsigned char *val, char size) {
-   return str2val(string, val, size, sizeof(short), "%hd");
+static int32_t to_int16 (int8_t *string, uint8_t *val, int8_t size) {
+   return str2val(string, val, size, sizeof(int16_t), "%hd");
 }
 
 
-static int to_uint16 (char *string, unsigned char *val, char size) {
-   return str2val(string, val, size, sizeof(short), "%hu");
+static int32_t to_uint16 (int8_t *string, uint8_t *val, int8_t size) {
+   return str2val(string, val, size, sizeof(uint16_t), "%hu");
 }
 
-static int to_int32 (char *string, unsigned char *val, char size) {
-   return str2val(string, val, size, sizeof(long), "%d");
+static int32_t to_int32 (int8_t *string, uint8_t *val, int8_t size) {
+   return str2val(string, val, size, sizeof(int32_t), "%d");
 }
 
-static int to_uint32 (char *string, unsigned char *val, char size) {
-   return str2val(string, val, size, sizeof(long), "%u");
+static int32_t to_uint32 (int8_t *string, uint8_t *val, int8_t size) {
+   return str2val(string, val, size, sizeof(uint32_t), "%u");
 }
 
-static int to_int64 (char *string, unsigned char *val, char size) {
-   return str2val(string, val, size, sizeof(long long), "%lld");
+static int32_t to_int64 (int8_t *string, uint8_t *val, int8_t size) {
+   return str2val(string, val, size, sizeof(int64_t), "%lld");
 }
 
-static int to_uint64 (char *string, unsigned char *val, char size) {
-   return str2val(string, val, size, sizeof(long long), "%llu");
+static int32_t to_uint64 (int8_t *string, uint8_t *val, int8_t size) {
 }
 
-static int to_string (char *string, unsigned char *val, char size) {
+static int32_t to_string (int8_t *string, uint8_t *val, int8_t size) {
    // initialize val
    memset(val, 0, size);
    // copy string to val only of string != "NULL"
@@ -155,11 +154,11 @@ static int to_string (char *string, unsigned char *val, char size) {
 
 
 // handle unknown base type
-static int unkonwn_base_type_2val (char *str, unsigned char *val, char size) {
-	unsigned char rval[size];
-	char *del = "/";
-	int i = 0;
-   char *tokloc;     // local token
+static int32_t unkonwn_base_type_2val (int8_t *str, uint8_t *val, int8_t size) {
+	uint8_t rval[size];
+	int8_t *del = "/";
+	int32_t i = 0;
+   int8_t *tokloc;     // local token
    char *svloc;      // save local token location
 
 	// reset rval;
@@ -198,7 +197,7 @@ static _base_type_to_value str2base[FIT_FIT_BASE_TYPE_COUNT] = {
 };
 
 _base_type_to_value *get_type_2base (FIT_FIT_BASE_TYPE type) {
-	int i = 0;
+	int32_t i = 0;
 
 	for (i = 0; i < FIT_FIT_BASE_TYPE_COUNT; i++) {
 		if (str2base[i].base_type == type)
@@ -209,7 +208,7 @@ _base_type_to_value *get_type_2base (FIT_FIT_BASE_TYPE type) {
 
 
 // get input line definition
-static int get_line_def (char *tok) {
+static int32_t get_line_def (int8_t *tok) {
 
    if (tok != NULL) {
       if (strcmp (tok, "DATA") == 0)
@@ -245,8 +244,8 @@ bool WriteFileHeader(FIT_FILE_HDR *file_header)
 
 // write data to FIT file
 // update global varibles: crc, fit_data_write
-int fit_write (void *buf, int size) {
-   int i;
+int32_t fit_write (void *buf, int32_t size) {
+   int32_t i;
 
    if ((i = fwrite(buf, 1, size, fit_f)) < size) {
       fprintf(stderr, "Failed to write to FIT file, wrote %d bytes instead of %d, %s\n", i, size, strerror(errno));
@@ -260,8 +259,8 @@ int fit_write (void *buf, int size) {
    return i;   
 }
 
-void print_def_mesg(unsigned char mesg_type) {
-   int i;
+void print_def_mesg(uint8_t mesg_type) {
+   int32_t i;
 
    fprintf(stderr, "DEF:M_TYPE,%d,FIELDS,%d,DEV_FIELDS,%d,,", mesg_type, mesg_type_def[mesg_type]->num_fields, mesg_type_def[mesg_type]->num_dev_fields);
    for (i = 0; i < mesg_type_def[mesg_type]->num_fields; i++)
@@ -282,10 +281,10 @@ bool process_data_line() {
    FIT_UINT8 mesg_type;
    FIT_UINT8  time_rec_bit;
    FIT_UINT8  time_offset;
-   int wbuf_off;                               // offset into write buffer
+   int32_t wbuf_off;                               // offset into write buffer
    _fit_mesg_def *mesg_def_p;
    _base_type_to_value *base_type_p;
-   int i;
+   int32_t i;
 
    // init variables
    wbuf_off = 1;     // wbuf[0] is record header;
@@ -309,7 +308,7 @@ bool process_data_line() {
    token = strtok(NULL, delim);
    if (token == NULL)
       return false;
-   to_uint8(token, (unsigned char *)&mesg_type, 1);
+   to_uint8(token, (uint8_t *)&mesg_type, 1);
 
    // check if mesg_type_def[mesg_type] exists
    if (mesg_type_def[mesg_type] == NULL)
@@ -323,7 +322,7 @@ bool process_data_line() {
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-      to_uint8(token, (unsigned char *)&time_offset, 1);
+      to_uint8(token, (uint8_t *)&time_offset, 1);
 
       //set reac header
       wbuf[0] |= FIT_HDR_TIME_REC_BIT;
@@ -392,10 +391,10 @@ bool process_definition_line() {
    FIT_UINT8 num_dev_fields;
    FIT_UINT8 field_member;
    FIT_MESG_NUM global_mesg_num;
-   int i;
-   int wbuf_off;                               // offset into write buffer
+   int32_t i;
+   int32_t wbuf_off;                               // offset into write buffer
    _fit_fixed_mesg_def fit_fixed_mesg_def;     // fixed portion of a definition message
-   int size;
+   int32_t size;
 
    // init variables
    memset(&fit_fixed_mesg_def, 0, sizeof(fit_fixed_mesg_def));
@@ -412,7 +411,7 @@ bool process_definition_line() {
    token = strtok(NULL, delim);
    if (token == NULL)
       return false;
-   to_uint8(token, (unsigned char *)&mesg_type, 1);
+   to_uint8(token, (uint8_t *)&mesg_type, 1);
    wbuf[0] |= mesg_type & FIT_HDR_TYPE_MASK;  // set message type;
 
    // get global message number title
@@ -423,7 +422,7 @@ bool process_definition_line() {
    token = strtok(NULL, delim);
    if (token == NULL)
       return false;
-   to_uint16(token, (unsigned char *)&global_mesg_num, 2);
+   to_uint16(token, (uint8_t *)&global_mesg_num, 2);
 
    // read number of fields title
    token = strtok(NULL, delim);
@@ -434,7 +433,7 @@ bool process_definition_line() {
    token = strtok(NULL, delim);
    if (token == NULL)
       return false;
-   to_uint8(token, (unsigned char *)&num_fields, 1);
+   to_uint8(token, (uint8_t *)&num_fields, 1);
 
    // read number of dev fields number title
    token = strtok(NULL, delim);
@@ -445,7 +444,7 @@ bool process_definition_line() {
    token = strtok(NULL, delim);
    if (token == NULL)
       return false;
-   to_uint8(token, (unsigned char *)&num_dev_fields, 1);   
+   to_uint8(token, (uint8_t *)&num_dev_fields, 1);   
 
    fit_fixed_mesg_def.arch = 0;
    fit_fixed_mesg_def.reserved_1 = 0;
@@ -478,30 +477,30 @@ bool process_definition_line() {
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-      to_uint8(token, (unsigned char *)&mesg_type_def[mesg_type]->fields[i].field_def_num, 1);
+      to_uint8(token, (uint8_t *)&mesg_type_def[mesg_type]->fields[i].field_def_num, 1);
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-      to_uint8(token, (unsigned char *)&mesg_type_def[mesg_type]->fields[i].size, 1);
+      to_uint8(token, (uint8_t *)&mesg_type_def[mesg_type]->fields[i].size, 1);
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-      to_uint8(token, (unsigned char *)&mesg_type_def[mesg_type]->fields[i].base_type, 1);
+      to_uint8(token, (uint8_t *)&mesg_type_def[mesg_type]->fields[i].base_type, 1);
    }
 
    for (i = 0; i < num_dev_fields; i++) {
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-      to_uint8(token, (unsigned char *)&mesg_type_def[mesg_type]->dev_fields[i].def_num, 1);
+      to_uint8(token, (uint8_t *)&mesg_type_def[mesg_type]->dev_fields[i].def_num, 1);
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-      to_uint8(token, (unsigned char *)&mesg_type_def[mesg_type]->dev_fields[i].size, 1);
+      to_uint8(token, (uint8_t *)&mesg_type_def[mesg_type]->dev_fields[i].size, 1);
       token = strtok(NULL, delim);
       if (token == NULL)
          return false;
-      to_uint8(token, (unsigned char *)&mesg_type_def[mesg_type]->dev_fields[i].dev_index, 1);
+      to_uint8(token, (uint8_t *)&mesg_type_def[mesg_type]->dev_fields[i].dev_index, 1);
    }
 
    // update wbuf
@@ -537,14 +536,14 @@ bool process_definition_line() {
 
 // cleanup function 
 void cleanup () {
-   int i;
+   int32_t i;
 
    fclose(fit_f);
    fclose(csv_f);
-   fclose(cfit_f); 
    free(rbuf);
    free(wbuf);
 #ifdef DEBUG
+   fclose(cfit_f); 
    free(cbuf);
 #endif
    for (i = 0; i < FIT_HDR_TYPE_MASK+1; i++) {
@@ -554,12 +553,12 @@ void cleanup () {
 }
 
 
-int main (int argc, char *argv[]) {                         
+int32_t main (int32_t argc, int8_t *argv[]) {                         
    FIT_FILE_HDR fit_file_hdr;                         // FIT file header                   
    _fit_mesg_def *fit_mesg_def_ptr;                   // address of last message def
-   int  line_mesg_deg;                                // csv line definition
-   static unsigned char rec_hdr;                      // record header
-   int line_def;                                      // CSV line definition
+   int32_t  line_mesg_deg;                                // csv line definition
+   static uint8_t rec_hdr;                      // record header
+   int32_t line_def;                                      // CSV line definition
 
    // print general license note
    printf("\
@@ -676,12 +675,12 @@ int main (int argc, char *argv[]) {
          case _FIT_PROTOCOL_VERSION:
             token = strtok(NULL, delim);
                if (token != NULL)
-         	      to_uint8(token, (unsigned char *)&fit_file_hdr.protocol_version, 1) ;
+         	      to_uint8(token, (uint8_t *)&fit_file_hdr.protocol_version, 1) ;
             break;
          case _FIT_PROFILE_VERSION:
             token = strtok(NULL, delim);
                if (token != NULL)
-         	      to_uint16(token, (unsigned char *)&fit_file_hdr.profile_version, 2) ;
+         	      to_uint16(token, (uint8_t *)&fit_file_hdr.profile_version, 2) ;
             break;
          case _FIT_DEF:
             if (!process_definition_line()) {

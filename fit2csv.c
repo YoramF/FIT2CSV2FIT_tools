@@ -43,7 +43,7 @@ typedef struct {
 typedef struct {
    FIT_UINT8 num_fields;
    FIT_UINT8 num_dev_fields;
-   unsigned short data_mesg_len;
+   uint16_t data_mesg_len;
    FIT_FIELD_DEF fields[0];
    FIT_DEV_FIELD_DEF dev_fields[0];
 } _fit_mesg_def;
@@ -52,18 +52,18 @@ typedef struct {
 static  FIT_UINT16 crc;                            // crc - we need to global to save argument passing
 static FILE *fit_f;                                // fit file handle
 static FILE *csv_f;                                // csv file handle
-static unsigned char *buf;                         // read buffer
+static uint8_t *buf;                         // read buffer
 static _fit_mesg_def *mesg_type_def[FIT_HDR_TYPE_MASK+1]; // track on local message types
 static _fit_fixed_mesg_def fit_fixed_mesg_def;     // fixed portion of a definition message     
-static unsigned char rec_hdr;                      // record header
-static int fit_data_read;                          // track how much data was read 
+static uint8_t rec_hdr;                      // record header
+static int32_t fit_data_read;                          // track how much data was read 
 
 /****************************************************/
 /* convert FIT values to string based on their type */
 /****************************************************/
 typedef struct {
    FIT_FIT_BASE_TYPE base_type;
-   char *(*val_to_str)(unsigned char *data, unsigned char size);
+   int8_t *(*val_to_str)(uint8_t *data, uint8_t size);
 } _base_type_to_string;
 
 enum {
@@ -77,24 +77,24 @@ enum {
    uint64
 };
 
-static char string[FIT_MAX_FIELD_SIZE*4+1];  // to allow unkown base type string
+static int8_t string[FIT_MAX_FIELD_SIZE*4+1];  // to allow unkown base type string
 
-static int prf (char *s, char *format, unsigned char *val, int type) {
+static int32_t prf (int8_t *s, int8_t *format, uint8_t *val, int32_t type) {
    switch (type) {
-      case int8: return sprintf(s, format, *(char *)val);
-      case uint8: return sprintf(s, format, *(unsigned char *)val);
-      case int16: return sprintf(s, format, *(short *)val);
-      case uint16: return sprintf(s, format, *(unsigned short *)val);
-      case int32: return sprintf(s, format, *(long *)val);
-      case uint32: return sprintf(s, format, *(unsigned long *)val);
-      case int64: return sprintf(s, format, *(long long *)val);
-      case uint64: return sprintf(s, format, *(unsigned long long *)val);
+      case int8: return sprintf(s, format, *(int8_t *)val);
+      case uint8: return sprintf(s, format, *(uint8_t *)val);
+      case int16: return sprintf(s, format, *(int16_t *)val);
+      case uint16: return sprintf(s, format, *(uint16_t *)val);
+      case int32: return sprintf(s, format, *(int32_t *)val);
+      case uint32: return sprintf(s, format, *(uint32_t *)val);
+      case int64: return sprintf(s, format, *(int64_t *)val);
+      case uint64: return sprintf(s, format, *(uint64_t *)val);
       default:
    }
 }
 
-static char *val2str (unsigned char *v, unsigned char size, char t_size, char *f1, char *f2, char f_s, int type) {
-   char *s = string;
+static int8_t *val2str (uint8_t *v, uint8_t size, int8_t t_size, int8_t *f1, int8_t *f2, int8_t f_s, int32_t type) {
+   int8_t *s = string;
 	prf(s, f1, v, type);
    size -= t_size;
    v += t_size;
@@ -108,42 +108,42 @@ static char *val2str (unsigned char *v, unsigned char size, char t_size, char *f
 	return string;
 }
 
-static char *int8_to_str (unsigned char *v, unsigned char size) {
-	return val2str(v, size, sizeof(char), "%3.3hhd", "|%3.3hhd", 3, int8);
+static int8_t *int8_to_str (uint8_t *v, uint8_t size) {
+	return val2str(v, size, sizeof(int8_t), "%3.3hhd", "|%3.3hhd", 3, int8);
 }
 
-static char *uint8_to_str (unsigned char *v, unsigned char size) {
-	return val2str(v, size, sizeof(char), "%3.3hhu", "|%3.3hhu", 3, uint8);
+static int8_t *uint8_to_str (uint8_t *v, uint8_t size) {
+	return val2str(v, size, sizeof(uint8_t), "%3.3hhu", "|%3.3hhu", 3, uint8);
 }
 
-static char *int16_to_str (unsigned char *v, unsigned char size) {
-	return val2str(v, size, sizeof(short), "%6.6hd", "|%6.6hd", 6, int16);
+static int8_t *int16_to_str (uint8_t *v, uint8_t size) {
+	return val2str(v, size, sizeof(int16_t), "%6.6hd", "|%6.6hd", 6, int16);
 }
 
 
-static char *uint16_to_str (unsigned char *v, unsigned char size) {
-	return val2str(v, size, sizeof(short), "%6.6hu", "|%6.6hu", 6, uint16);
+static int8_t *uint16_to_str (uint8_t *v, uint8_t size) {
+	return val2str(v, size, sizeof(uint16_t), "%6.6hu", "|%6.6hu", 6, uint16);
 }
 
-static char *int32_to_str (unsigned char *v, unsigned char size) {
-	return val2str(v, size, sizeof(long), "%11.11d", "|%11.11d", 11, int32);
+static int8_t *int32_to_str (uint8_t *v, uint8_t size) {
+	return val2str(v, size, sizeof(int32_t), "%11.11ld", "|%11.11ld", 11, int32);
 }
 
-static char *uint32_to_str (unsigned char *v, unsigned char size) {
-	return val2str(v, size, sizeof(long), "%11.11u", "|%11.11u", 11, uint32);
+static int8_t *uint32_to_str (uint8_t *v, uint8_t size) {
+	return val2str(v, size, sizeof(uint32_t), "%11.11lu", "|%11.11lu", 11, uint32);
 }
 
-static char *int64_to_str (unsigned char *v, unsigned char size) {
-	return val2str(v, size, sizeof(long long), "%21.21lld", "|%21.21lld", 21, int64);
+static int8_t *int64_to_str (uint8_t *v, uint8_t size) {
+	return val2str(v, size, sizeof(int64_t), "%21.21lld", "|%21.21lld", 21, int64);
 }
 
-static char *uint64_to_str (unsigned char *v, unsigned char size) {
-	return val2str(v, size, sizeof(long long), "%21.21llu", "|%21.21llu", 21, uint64);
+static int8_t *uint64_to_str (uint8_t *v, uint8_t size) {
+	return val2str(v, size, sizeof(uint64_t), "%21.21llu", "|%21.21llu", 21, uint64);
 }
 
-static char *string_to_str (unsigned char *v, unsigned char size) {
+static int8_t *string_to_str (uint8_t *v, uint8_t size) {
    // check for empty string
-   char *p = v;
+   int8_t *p = v;
    if (p[0] == 0)
       strcpy(string, "NULL");
    else
@@ -152,9 +152,9 @@ static char *string_to_str (unsigned char *v, unsigned char size) {
 }
 
 // convert unknown value base type to string of byts values
-static char *unkonwn_base_type (unsigned char *val, unsigned char size) {
-   char *str = string;
-   unsigned char *uc = val;
+static int8_t *unkonwn_base_type (uint8_t *val, uint8_t size) {
+   int8_t *str = string;
+   uint8_t *uc = val;
    while (size) {
       sprintf(str, "%03hhu/", *uc);
       str += 4;
@@ -185,7 +185,7 @@ static _base_type_to_string base2str[FIT_FIT_BASE_TYPE_COUNT] = {
 };
 
 _base_type_to_string *get_type_2str (FIT_FIT_BASE_TYPE type) {
-	int i = 0;
+	int32_t i = 0;
 
 	for (i = 0; i < FIT_FIT_BASE_TYPE_COUNT; i++) {
 		if (base2str[i].base_type == type)
@@ -196,7 +196,7 @@ _base_type_to_string *get_type_2str (FIT_FIT_BASE_TYPE type) {
 
 // cleanup function 
 void cleanup () {
-   int i;
+   int32_t i;
 
    fclose(fit_f);
    free(buf);
@@ -207,8 +207,8 @@ void cleanup () {
 }
 
 // read buffer from FIT file
-int fit_read (void *buf, int size) {
-   int i;
+int32_t fit_read (void *buf, int32_t size) {
+   int32_t i;
 
    if ((i = fread(buf, 1, size, fit_f)) < size) {
       fprintf(stderr, "Reading FIT file failed, read %d bytes instead of %d, %s\n", i, size, strerror(errno));
@@ -222,9 +222,9 @@ int fit_read (void *buf, int size) {
 }
 
 // calculate overall data message len
-unsigned short calc_data_mesg_len (_fit_mesg_def *fit_mesg_def) {
-   unsigned short us = 0;
-   int i;
+uint16_t calc_data_mesg_len (_fit_mesg_def *fit_mesg_def) {
+   uint16_t us = 0;
+   int32_t i;
 
    // calculate fields data sizes
    for (i = 0; i < fit_mesg_def->num_fields; i++)
@@ -237,8 +237,8 @@ unsigned short calc_data_mesg_len (_fit_mesg_def *fit_mesg_def) {
    return us;
 }
 
-void print_data_mesg (unsigned char mesg_type) {
-   int i;
+void print_data_mesg (uint8_t mesg_type) {
+   int32_t i;
    void *val_ptr;
    _base_type_to_string *base_type_p;
 
@@ -275,8 +275,8 @@ void print_data_mesg (unsigned char mesg_type) {
 
 // print message definition text and fields titles
 // this line starts with "#" do that csv2fit will ignore it when reading the csv file
-void print_data_titles (unsigned char mesg_type) {
-   int i;
+void print_data_titles (uint8_t mesg_type) {
+   int32_t i;
 
    fprintf(csv_f, "#DEF:M_TYPE,%d,%s,%d,,,,", mesg_type, get_mesg_title(fit_fixed_mesg_def.global_mesg_num), fit_fixed_mesg_def.global_mesg_num);
 
@@ -286,8 +286,8 @@ void print_data_titles (unsigned char mesg_type) {
    fprintf(csv_f, "\n");
 }
 
-void print_def_mesg(unsigned char mesg_type) {
-   int i;
+void print_def_mesg(uint8_t mesg_type) {
+   int32_t i;
 
    fprintf(csv_f, "DEF:M_TYPE,%d,M_NUM,%d,FIELDS,%d,DEV_FIELDS,%d,,", mesg_type, fit_fixed_mesg_def.global_mesg_num, mesg_type_def[mesg_type]->num_fields, mesg_type_def[mesg_type]->num_dev_fields);
    for (i = 0; i < mesg_type_def[mesg_type]->num_fields; i++)
@@ -303,10 +303,10 @@ void print_def_mesg(unsigned char mesg_type) {
 
 // read record definition from FIT file
 _fit_mesg_def *add_new_def_mesg() {
-   int alloc_size;
-   int read_size;
+   int32_t alloc_size;
+   int32_t read_size;
    FIT_UINT8 num_of_dev_fields;
-   unsigned char mesg_type;
+   uint8_t mesg_type;
 
    // read fit_fixed_mesg_def
    if (fit_read(&fit_fixed_mesg_def, sizeof(_fit_fixed_mesg_def)) == sizeof(_fit_fixed_mesg_def)) {
@@ -368,11 +368,11 @@ void print_file_header (FIT_FILE_HDR *fit_file_header) {
    fprintf(csv_f, "FIT_PROFILE_VERSION,  %d\n", fit_file_header->profile_version);
 }
 
-int main (int argc, char *argv[]) {
-   int r;                                
-   unsigned short data_size;
+int32_t main (int32_t argc, int8_t *argv[]) {
+   int32_t r;                                
+   uint16_t data_size;
    FIT_FILE_HDR fit_file_hdr;                         // FIT file header                   
-   unsigned char mesg_type;                           // last read message type
+   uint8_t mesg_type;                           // last read message type
    _fit_mesg_def *fit_mesg_def_ptr;                   // address of last message def
 
    // print general license note
